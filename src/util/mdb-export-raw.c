@@ -50,6 +50,10 @@ main(int argc, char **argv)
 	char *value;
 	size_t length;
 
+	#ifdef _WIN32
+	setmode(fileno(stdout), O_BINARY);
+	#endif
+
 	GOptionContext *opt_context;
 
 	opt_context = g_option_context_new("<file> <table> - export data from MDB file as raw");
