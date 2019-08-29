@@ -49,7 +49,6 @@ main(int argc, char **argv)
 	char *str_bin_mode = NULL;
 	char *value;
 	size_t length;
-        unsigned int size;
 
 	GOptionContext *opt_context;
 
@@ -129,7 +128,6 @@ main(int argc, char **argv)
                                 unsigned int str_size = (unsigned int) strlen(bound_values[i]);
                                 fwrite(&str_size, int_size, 1, outfile);
                                 fwrite(bound_values[i], str_size, 1, outfile);
-                                fprintf(stderr, "Writing out string (%u): %s\n", str_size, bound_values[i]);
                                 break;
                             }
 
@@ -138,7 +136,6 @@ main(int argc, char **argv)
                                 char byte = (char) strtol(bound_values[i], NULL, 10);
                                 fwrite(&char_size, int_size, 1, outfile);
                                 fwrite(&byte, char_size, 1, outfile);
-                                fprintf(stderr, "Writing out byte: %hhi\n", byte);
                                 break;
                             }   
 
@@ -147,7 +144,6 @@ main(int argc, char **argv)
                                 short val = (short) strtol(bound_values[i], NULL, 10);
                                 fwrite(&short_size, int_size, 1, outfile);
                                 fwrite(&val, short_size, 1, outfile);
-                                fprintf(stderr, "Writing out short: %hi\n", val);
                                 break;
                             }
 
@@ -156,7 +152,6 @@ main(int argc, char **argv)
                                 long val = (long) strtol(bound_values[i], NULL, 10);
                                 fwrite(&int_size, int_size, 1, outfile);
                                 fwrite(&val, int_size, 1, outfile);
-                                fprintf(stderr, "Writing out long: %li\n", val);
                                 break;
                             }
                             
