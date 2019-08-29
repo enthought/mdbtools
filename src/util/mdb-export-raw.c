@@ -15,7 +15,7 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-
+#include "string.h"
 #include "mdbtools.h"
 
 #ifdef DMALLOC
@@ -76,7 +76,7 @@ main(int argc, char **argv)
 	/* read table */
 	mdb_read_columns(table);
 	mdb_rewind_table(table);
-	
+
 	bound_values = (char **) g_malloc(table->num_cols * sizeof(char *));
 	bound_lens = (int *) g_malloc(table->num_cols * sizeof(int));
 	for (i=0;i<table->num_cols;i++) {
@@ -84,11 +84,12 @@ main(int argc, char **argv)
 		bound_values[i] = (char *) g_malloc0(MDB_BIND_SIZE);
 		mdb_bind_column(table, i+1, bound_values[i], &bound_lens[i]);
 	}
-        
+
         const unsigned int null_size = 0;
-        const unsigned int string_size = MDB_MAX_OBJ_NAME - 1;
         const unsigned int int_size  = sizeof(unsigned int);
-        
+        const unsigned int char_size  = sizeof(unsigned char);
+        const unsigned int short_size = sizeof(unsigned short);
+
         /* Write out the number of columns and rows */
         fwrite(&(table->num_rows), int_size, 1, outfile);
         fwrite(&(table->num_cols), int_size, 1, outfile);
@@ -97,8 +98,9 @@ main(int argc, char **argv)
 		for (i=0; i<table->num_cols; i++) {
 			col=g_ptr_array_index(table->columns,i);
                         fwrite(&(col->col_type), int_size, 1, outfile);
-                        fwrite(&string_size, int_size, 1, outfile);
-                        fwrite(&(col->name), string_size, 1, outfile);
+                        unsigned int str_size = (unsigned int) strlen(col->name);
+                        fwrite(&str_size, int_size, 1, outfile);
+                        fwrite(&(col->name), str_size, 1, outfile);
 		}
 
 	}
@@ -110,21 +112,58 @@ main(int argc, char **argv)
 			if (!bound_lens[i]) {
                             fwrite(&null_size, int_size, 1, outfile);
                             continue;
+                        }
 
-			} else {
-				if (col->col_type == MDB_OLE) {
-					value = mdb_ole_read_full(mdb, col, &length);
-				} else {
-					value = bound_values[i];
-					length = bound_lens[i];
-				}
-                                size = (unsigned int) length;
-                                fwrite(&size, int_size, 1, outfile);
-                                fwrite(value, size, 1, outfile);
+                        switch (col->col_type) {
+                            case MDB_OLE:
+                            {
+                                value = mdb_ole_read_full(mdb, col, &length);
+                                fwrite(&length, int_size, 1, outfile);
+                                fwrite(value, length, 1, outfile);
+                                free(value);
+                                break;
+                            }
+                            
+                            case MDB_BINARY: case MDB_TEXT: case MDB_MEMO:
+                            {
+                                unsigned int str_size = (unsigned int) strlen(bound_values[i]);
+                                fwrite(&str_size, int_size, 1, outfile);
+                                fwrite(bound_values[i], str_size, 1, outfile);
+                                fprintf(stderr, "Writing out string (%u): %s\n", str_size, bound_values[i]);
+                                break;
+                            }
+
+                            case MDB_BYTE: case MDB_BOOL:
+                            {
+                                char byte = (char) strtol(bound_values[i], NULL, 10);
+                                fwrite(&char_size, int_size, 1, outfile);
+                                fwrite(&byte, char_size, 1, outfile);
+                                fprintf(stderr, "Writing out byte: %hhi\n", byte);
+                                break;
+                            }   
+
+                            case MDB_INT:
+                            {
+                                short val = (short) strtol(bound_values[i], NULL, 10);
+                                fwrite(&short_size, int_size, 1, outfile);
+                                fwrite(&val, short_size, 1, outfile);
+                                fprintf(stderr, "Writing out short: %hi\n", val);
+                                break;
+                            }
+
+                            case MDB_LONGINT:
+                            {
+                                long val = (long) strtol(bound_values[i], NULL, 10);
+                                fwrite(&int_size, int_size, 1, outfile);
+                                fwrite(&val, int_size, 1, outfile);
+                                fprintf(stderr, "Writing out long: %li\n", val);
+                                break;
+                            }
+                            
+                            default:
+                                fprintf(stderr, "Unhandled data type %i for %s", col->col_type, col->name);
                                 
-				if (col->col_type == MDB_OLE)
-					free(value);
-			}
+                        }
 		}
 	}
 	
