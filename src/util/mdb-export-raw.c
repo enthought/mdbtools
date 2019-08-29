@@ -88,6 +88,8 @@ main(int argc, char **argv)
         const unsigned int int_size  = sizeof(unsigned int);
         const unsigned int char_size  = sizeof(unsigned char);
         const unsigned int short_size = sizeof(unsigned short);
+        const unsigned int float_size = sizeof(float);
+        const unsigned int double_size = sizeof(double);
 
         /* Write out the number of columns and rows */
         fwrite(&(table->num_rows), int_size, 1, outfile);
@@ -152,6 +154,22 @@ main(int argc, char **argv)
                                 long val = (long) strtol(bound_values[i], NULL, 10);
                                 fwrite(&int_size, int_size, 1, outfile);
                                 fwrite(&val, int_size, 1, outfile);
+                                break;
+                            }
+
+                            case MDB_FLOAT:
+                            {
+                                float val = strtof(bound_values[i], NULL);
+                                fwrite(&float_size, int_size, 1, outfile);
+                                fwrite(&val, float_size, 1, outfile);
+                                break;
+                            }
+
+                            case MDB_DOUBLE:
+                            {
+                                double val = strtod(bound_values[i], NULL);
+                                fwrite(&double_size, int_size, 1, outfile);
+                                fwrite(&val, double_size, 1, outfile);
                                 break;
                             }
                             
