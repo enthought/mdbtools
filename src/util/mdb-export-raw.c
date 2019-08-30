@@ -80,9 +80,8 @@ main(int argc, char **argv)
 	}
 
         if (filter_str) {
-            char delim = '=';
-            filter_key = strtok(filter_str, &delim);
-            filter_value = strtok(NULL, &delim);
+            filter_key = strtok(filter_str, "=");
+            filter_value = strtok(NULL, "=");
             if (!filter_value) {
                 fprintf(stderr, "Bad filter string: %s\n", filter_str);
                 exit(1);
