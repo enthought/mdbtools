@@ -48,21 +48,46 @@ main(int argc, char **argv)
 	char *namespace = NULL;
 	char *str_bin_mode = NULL;
 	char *value;
+        char *filter_str = NULL;
+        char *filter_key = NULL;
+        char *filter_value = NULL;
 	size_t length;
 
 	#ifdef _WIN32
 	setmode(fileno(stdout), O_BINARY);
 	#endif
 
+	GOptionEntry entries[] = {
+		{ "filter", 'f', 0, G_OPTION_ARG_STRING, &filter_str, "Supply a column=value filter on exported rows.", NULL},
+                { NULL },
+        };
+        GError *error = NULL;
 	GOptionContext *opt_context;
 
 	opt_context = g_option_context_new("<file> <table> - export data from MDB file as raw");
+	g_option_context_add_main_entries(opt_context, entries, NULL /*i18n*/);
+	if (!g_option_context_parse (opt_context, &argc, &argv, &error))
+	{
+		fprintf(stderr, "option parsing failed: %s\n", error->message);
+		fputs(g_option_context_get_help(opt_context, TRUE, NULL), stderr);
+		exit (1);
+	}
+
 	if (argc != 3) {
 		fputs("Wrong number of arguments.\n\n", stderr);
 		fputs(g_option_context_get_help(opt_context, TRUE, NULL), stderr);
 		exit(1);
 	}
 
+        if (filter_str) {
+            filter_key = strtok(filter_str, "=");
+            filter_value = strtok(NULL, "=");
+            if (!filter_value) {
+                fprintf(stderr, "Bad filter string: %s\n", filter_str);
+                exit(1);
+            }
+        }
+        
 	/* Open file */
 	if (!(mdb = mdb_open(argv[1], MDB_NOFLAGS))) {
 		/* Don't bother clean up memory before exit */
@@ -82,12 +107,34 @@ main(int argc, char **argv)
 
 	bound_values = (char **) g_malloc(table->num_cols * sizeof(char *));
 	bound_lens = (int *) g_malloc(table->num_cols * sizeof(int));
+        int filter_column_index = -1;
 	for (i=0;i<table->num_cols;i++) {
 		/* bind columns */
 		bound_values[i] = (char *) g_malloc0(MDB_BIND_SIZE);
 		mdb_bind_column(table, i+1, bound_values[i], &bound_lens[i]);
+                col=g_ptr_array_index(table->columns,i);
+                if (filter_key && !strcmp(filter_key, col->name)) {
+                    filter_column_index = i;
+                }
 	}
+        
+        if (filter_str && filter_column_index < 0) {
+            fprintf(stderr, "Filter column '%s' not found in table\n", filter_key);
+            exit(1);
+        }
 
+        unsigned int num_rows = 0;
+        if (filter_column_index > -1) {
+            while(mdb_fetch_row(table)) {
+                if (!strcmp(filter_value, bound_values[filter_column_index])) {
+                    num_rows++;
+                }
+            }
+            mdb_rewind_table(table);
+        } else {
+            num_rows = table->num_rows;
+        }
+        
         const unsigned int null_size = 0;
         const unsigned int int_size  = sizeof(unsigned int);
         const unsigned int char_size  = sizeof(unsigned char);
@@ -96,7 +143,7 @@ main(int argc, char **argv)
         const unsigned int double_size = sizeof(double);
 
         /* Write out the number of columns and rows */
-        fwrite(&(table->num_rows), int_size, 1, outfile);
+        fwrite(&num_rows, int_size, 1, outfile);
         fwrite(&(table->num_cols), int_size, 1, outfile);
         
 	if (header_row) {
@@ -111,6 +158,12 @@ main(int argc, char **argv)
 	}
 
 	while(mdb_fetch_row(table)) {
+            
+            if (filter_column_index > -1) {
+                if (strcmp(filter_value, bound_values[filter_column_index])) {
+                    continue;
+                }
+            }
 
 		for (i=0;i<table->num_cols;i++) {
 			col=g_ptr_array_index(table->columns,i);
