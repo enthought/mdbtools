@@ -120,6 +120,7 @@ main(int argc, char **argv)
         
         if (filter_str && filter_column_index < 0) {
             fprintf(stderr, "Filter column '%s' not found in table\n", filter_key);
+            exit(1);
         }
 
         unsigned int num_rows = 0;
